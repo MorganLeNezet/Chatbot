@@ -6,8 +6,8 @@ const apiToken = 'c435ff34fc54d0cecfe276073173dc0be4a6d7564b7e9bd976cff4f7aab286
 
 
 const botNames = {
-  meteo: 'GeoBot',
-  geo: 'VilleBot',
+  meteo: 'MétéoBot',
+  geo: 'GeoBot',
   randomUser: 'UserBot'
 };
 
@@ -33,18 +33,18 @@ const sendMessage = () => {
 
     if (messageText.startsWith('je veux les coordonnées géographique du code insee suivant ')) {
       const codeINSEE = messageText.substring('je veux les coordonnées géographique du code insee suivant '.length);
-      fetchCityInfo(codeINSEE);
+      fetchCityInfo(codeINSEE, userMessage);
     } else if (messageText.startsWith('je veux les informations de la ville suivante ')) {
       const codePostal = messageText.substring('je veux les informations de la ville suivante '.length);
-      fetchCityInfoByPostalCode(codePostal);
+      fetchCityInfoByPostalCode(codePostal, userMessage);
     } else if (messageText.toLowerCase() === 'je veux générer un utilisateur') {
-      generateRandomUser();
+      generateRandomUser(userMessage);
     } else if (messageText.toLowerCase() === 'help') {
-      displayHelp();
+      displayHelp(userMessage);
     } else {
       const botReply = { type: 'bot', text: 'Désolé, je ne comprends pas votre demande.', botName: 'HelperBot' };
       addMessageToChat(botReply);
-      saveMessage(userMessage, botReply);
+      saveMessagePair(userMessage, botReply);
     }
 
     messageInput.value = '';
@@ -74,7 +74,7 @@ const createMessageElement = (messageText, sender, botName = '') => {
   return messageElement;
 };
 
-const saveMessage = (userMessage, botReply) => {
+const saveMessagePair = (userMessage, botReply) => {
   const messages = getStoredMessages();
   const timestamp = Date.now();
   messages[timestamp] = { userMessage, botReply };
@@ -94,7 +94,7 @@ const getStoredMessages = () => {
   return storedMessages ? JSON.parse(storedMessages) : {};
 };
 
-const fetchCityInfo = async (codeINSEE) => {
+const fetchCityInfo = async (codeINSEE, userMessage) => {
   const apiUrl = `https://api.meteo-concept.com/api/location/city?token=${apiToken}&insee=${encodeURIComponent(codeINSEE)}`;
 
   try {
@@ -106,13 +106,13 @@ const fetchCityInfo = async (codeINSEE) => {
     const cityInfo = formatCityInfo(data);
     const botReply = { type: 'bot', text: cityInfo, botName: botNames.meteo };
     addMessageToChat(botReply);
-    saveMessage(codeINSEE, botReply);
+    saveMessagePair(userMessage, botReply);
   } catch (error) {
     console.error('Erreur API Météo Concept:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations de la ville.';
     const botReply = { type: 'bot', text: errorMessage, botName: botNames.meteo };
     addMessageToChat(botReply);
-    saveMessage(codeINSEE, botReply);
+    saveMessagePair(userMessage, botReply);
   }
 };
 
@@ -122,7 +122,7 @@ const formatCityInfo = (data) => {
   return `Coordonnées géographiques :\nLatitude: ${latitude}\nLongitude: ${longitude}\nAltitude: ${altitude} mètres.`;
 };
 
-const fetchCityInfoByPostalCode = async (codePostal) => {
+const fetchCityInfoByPostalCode = async (codePostal, userMessage) => {
   const apiUrl = `https://geo.api.gouv.fr/communes?codePostal=${encodeURIComponent(codePostal)}`;
 
   try {
@@ -135,19 +135,19 @@ const fetchCityInfoByPostalCode = async (codePostal) => {
       const cityInfo = formatCityInfoByPostalCode(data[0]);
       const botReply = { type: 'bot', text: cityInfo, botName: botNames.geo };
       addMessageToChat(botReply);
-      saveMessage(codePostal, botReply);
+      saveMessagePair(userMessage, botReply);
     } else {
       const errorMessage = 'Aucune ville trouvée pour ce code postal.';
       const botReply = { type: 'bot', text: errorMessage, botName: botNames.geo };
       addMessageToChat(botReply);
-      saveMessage(codePostal, botReply);
+      saveMessagePair(userMessage, botReply);
     }
   } catch (error) {
     console.error('Erreur API Géo:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations de la ville.';
     const botReply = { type: 'bot', text: errorMessage, botName: botNames.geo };
     addMessageToChat(botReply);
-    saveMessage(codePostal, botReply);
+    saveMessagePair(userMessage, botReply);
   }
 };
 
@@ -156,7 +156,7 @@ const formatCityInfoByPostalCode = (data) => {
   return `Informations pour le code postal :\nNom de la ville : ${nom}\nCode INSEE : ${code}\nCode Département : ${codeDepartement}\nPopulation : ${population}`;
 };
 
-const generateRandomUser = async () => {
+const generateRandomUser = async (userMessage) => {
   const apiUrl = 'https://randomuser.me/api/';
 
   try {
@@ -168,13 +168,13 @@ const generateRandomUser = async () => {
     const userInfo = formatRandomUserInfo(data.results[0]);
     const botReply = { type: 'bot', text: userInfo, botName: botNames.randomUser };
     addMessageToChat(botReply);
-    saveMessage('generateRandomUser', botReply);
+    saveMessagePair(userMessage, botReply);
   } catch (error) {
     console.error('Erreur API Random User:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu générer un utilisateur.';
     const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
     addMessageToChat(botReply);
-    saveMessage('generateRandomUser', botReply);
+    saveMessagePair(userMessage, botReply);
   }
 };
 
@@ -192,7 +192,7 @@ const formatRandomUserInfo = (user) => {
   `;
 };
 
-const displayHelp = () => {
+const displayHelp = (userMessage) => {
   const helpMessage = `Commandes disponibles :
 1. "je veux les coordonnées géographique du code insee suivant [code INSEE]" - Pour obtenir les coordonnées géographiques d'une ville par son code INSEE.
 2. "je veux les informations de la ville suivante [code postal]" - Pour obtenir les informations sur une ville par son code postal.
@@ -201,7 +201,7 @@ const displayHelp = () => {
 
   const botReply = { type: 'bot', text: helpMessage, botName: 'HelperBot' };
   addMessageToChat(botReply);
-  saveMessage('help', botReply);
+  saveMessagePair(userMessage, botReply);
 };
 
 const clearLocalStorage = () => {
