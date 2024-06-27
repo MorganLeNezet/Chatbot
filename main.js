@@ -4,7 +4,6 @@ import './style.css'
 // Token pour l'API Météo Concept
 const apiToken = 'c435ff34fc54d0cecfe276073173dc0be4a6d7564b7e9bd976cff4f7aab28647';
 
-
 const botNames = {
   meteo: 'MétéoBot',
   geo: 'GeoBot',
@@ -39,6 +38,17 @@ const sendMessage = () => {
       fetchCityInfoByPostalCode(codePostal, userMessage);
     } else if (messageText.toLowerCase() === 'je veux générer un utilisateur') {
       generateRandomUser(userMessage);
+    } else if (messageText.toLowerCase() === 'je veux un utilisateur avec les mots de passe cryptée') {
+      generateRandomUserWithEncryptedPasswords(userMessage);
+    } else if (messageText.toLowerCase().startsWith('je veux générer ')) {
+      const numberOfUsers = parseInt(messageText.split(' ')[3], 10);
+      if (!isNaN(numberOfUsers)) {
+        generateMultipleRandomUsers(numberOfUsers, userMessage);
+      } else {
+        const botReply = { type: 'bot', text: 'Veuillez spécifier un nombre valide.', botName: 'UserBot' };
+        addMessageToChat(botReply);
+        saveMessagePair(userMessage, botReply);
+      }
     } else if (messageText.toLowerCase() === 'help') {
       displayHelp(userMessage);
     } else {
@@ -178,6 +188,50 @@ const generateRandomUser = async (userMessage) => {
   }
 };
 
+const generateRandomUserWithEncryptedPasswords = async (userMessage) => {
+  const apiUrl = 'https://randomuser.me/api/';
+
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des données.');
+    }
+    const data = await response.json();
+    const userInfo = formatRandomUserInfoWithEncryptedPasswords(data.results[0]);
+    const botReply = { type: 'bot', text: userInfo, botName: botNames.randomUser };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  } catch (error) {
+    console.error('Erreur API Random User:', error.message);
+    const errorMessage = 'Désolé, nous n\'avons pas pu générer un utilisateur.';
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  }
+};
+
+const generateMultipleRandomUsers = async (numberOfUsers, userMessage) => {
+  const apiUrl = `https://randomuser.me/api/?results=${encodeURIComponent(numberOfUsers)}`;
+
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des données.');
+    }
+    const data = await response.json();
+    const userInfo = data.results.map(user => formatRandomUserInfo(user)).join('\n\n');
+    const botReply = { type: 'bot', text: userInfo, botName: botNames.randomUser };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  } catch (error) {
+    console.error('Erreur API Random User:', error.message);
+    const errorMessage = 'Désolé, nous n\'avons pas pu générer des utilisateurs.';
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  }
+};
+
 const formatRandomUserInfo = (user) => {
   const { name, location, email, login, picture } = user;
   return `
@@ -187,17 +241,40 @@ const formatRandomUserInfo = (user) => {
       <p>Adresse : ${location.street.number} ${location.street.name}, ${location.city}, ${location.state}, ${location.country}, ${location.postcode}</p>
       <p>Email : ${email}</p>
       <p>Pseudo : ${login.username}</p>
+    </div>
+  `;
+};
+
+const formatRandomUserInfoWithEncryptedPasswords = (user) => {
+  const { name, location, email, login, picture } = user;
+  return `
+    <div>
+      <img src="${picture.large}" alt="User Picture" style="width:100px;height:100px;">
+      <p>Nom : ${name.title} ${name.first} ${name.last}</p>
+      <p>Adresse : ${location.street.number} ${location.street.name}, ${location.city}, ${location.state}, ${location.country}, ${location.postcode}</p>
+      <p>Email : ${email}</p>
+      <p>Pseudo : ${login.username}</p>
       <p>Mot de passe : ${login.password}</p>
+      <p>Salt : ${login.salt}</p>
+      <p>MD5 : ${login.md5}</p>
+      <p>SHA-1 : ${login.sha1}</p>
+      <p>SHA-256 : ${login.sha256}</p>
     </div>
   `;
 };
 
 const displayHelp = (userMessage) => {
   const helpMessage = `Commandes disponibles :
+- GeoBot : 
 1. "je veux les coordonnées géographique du code insee suivant [code INSEE]" - Pour obtenir les coordonnées géographiques d'une ville par son code INSEE.
+- InfoBot : 
 2. "je veux les informations de la ville suivante [code postal]" - Pour obtenir les informations sur une ville par son code postal.
+- UserBot : 
 3. "je veux générer un utilisateur" - Pour générer un utilisateur aléatoire avec ses informations.
-4. "help" - Pour afficher ce message d'aide.`;
+4. "je veux un utilisateur avec les mots de passe cryptée" - Pour générer un utilisateur aléatoire avec les mots de passe cryptés.
+5. "je veux générer [nombre] utilisateurs" - Pour générer plusieurs utilisateurs aléatoires.
+HelperBot :
+6. "help" - Pour afficher ce message d'aide.`;
 
   const botReply = { type: 'bot', text: helpMessage, botName: 'HelperBot' };
   addMessageToChat(botReply);
