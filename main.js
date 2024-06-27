@@ -1,7 +1,15 @@
-import './style.css';
+import './style.css'
+
 
 // Token pour l'API Météo Concept
 const apiToken = 'c435ff34fc54d0cecfe276073173dc0be4a6d7564b7e9bd976cff4f7aab28647';
+
+
+const botNames = {
+  meteo: 'GeoBot',
+  geo: 'VilleBot',
+  randomUser: 'UserBot'
+};
 
 const initializeApp = () => {
   document.getElementById('sendButton').addEventListener('click', () => sendMessage());
@@ -13,7 +21,7 @@ const initializeApp = () => {
   document.getElementById('clearLocalStorage').addEventListener('click', clearLocalStorage);
   
   loadStoredMessages();
-}
+};
 
 const sendMessage = () => {
   const messageInput = document.getElementById('messageInput');
@@ -34,39 +42,44 @@ const sendMessage = () => {
     } else if (messageText.toLowerCase() === 'help') {
       displayHelp();
     } else {
-      const botReply = { type: 'bot', text: 'Désolé, je ne comprends pas votre demande.' };
+      const botReply = { type: 'bot', text: 'Désolé, je ne comprends pas votre demande.', botName: 'HelperBot' };
       addMessageToChat(botReply);
       saveMessage(userMessage, botReply);
     }
 
     messageInput.value = '';
   }
-}
+};
 
 const addMessageToChat = (message) => {
-  const messageElement = createMessageElement(message.text, message.type);
+  const messageElement = createMessageElement(message.text, message.type, message.botName);
   document.getElementById('chatBox').appendChild(messageElement);
   document.getElementById('chatBox').scrollTop = document.getElementById('chatBox').scrollHeight;
-}
+};
 
-const createMessageElement = (messageText, sender) => {
+const createMessageElement = (messageText, sender, botName = '') => {
   const messageElement = document.createElement('div');
   messageElement.classList.add('message', sender);
 
   if (sender === 'bot') {
-    messageElement.innerHTML = messageText.replace(/\n/g, '<br>');
+    const botNameElement = document.createElement('div');
+    botNameElement.classList.add('bot-name');
+    botNameElement.textContent = botName;
+    messageElement.appendChild(botNameElement);
+    messageElement.innerHTML += messageText.replace(/\n/g, '<br>');
   } else {
     messageElement.textContent = messageText;
   }
+
   return messageElement;
-}
+};
 
 const saveMessage = (userMessage, botReply) => {
   const messages = getStoredMessages();
   const timestamp = Date.now();
   messages[timestamp] = { userMessage, botReply };
   localStorage.setItem('chatMessages', JSON.stringify(messages));
-}
+};
 
 const loadStoredMessages = () => {
   const messages = getStoredMessages();
@@ -74,14 +87,13 @@ const loadStoredMessages = () => {
     addMessageToChat(pair.userMessage);
     addMessageToChat(pair.botReply);
   });
-}
+};
 
 const getStoredMessages = () => {
   const storedMessages = localStorage.getItem('chatMessages');
   return storedMessages ? JSON.parse(storedMessages) : {};
-}
+};
 
-// API Météo Concep
 const fetchCityInfo = async (codeINSEE) => {
   const apiUrl = `https://api.meteo-concept.com/api/location/city?token=${apiToken}&insee=${encodeURIComponent(codeINSEE)}`;
 
@@ -92,25 +104,24 @@ const fetchCityInfo = async (codeINSEE) => {
     }
     const data = await response.json();
     const cityInfo = formatCityInfo(data);
-    const botReply = { type: 'bot', text: cityInfo };
+    const botReply = { type: 'bot', text: cityInfo, botName: botNames.meteo };
     addMessageToChat(botReply);
     saveMessage(codeINSEE, botReply);
   } catch (error) {
     console.error('Erreur API Météo Concept:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations de la ville.';
-    const botReply = { type: 'bot', text: errorMessage };
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.meteo };
     addMessageToChat(botReply);
     saveMessage(codeINSEE, botReply);
   }
-}
+};
 
 const formatCityInfo = (data) => {
   const { city } = data;
   const { latitude, longitude, altitude } = city;
   return `Coordonnées géographiques :\nLatitude: ${latitude}\nLongitude: ${longitude}\nAltitude: ${altitude} mètres.`;
-}
+};
 
-// l'API Géo 
 const fetchCityInfoByPostalCode = async (codePostal) => {
   const apiUrl = `https://geo.api.gouv.fr/communes?codePostal=${encodeURIComponent(codePostal)}`;
 
@@ -122,29 +133,29 @@ const fetchCityInfoByPostalCode = async (codePostal) => {
     const data = await response.json();
     if (data.length > 0) {
       const cityInfo = formatCityInfoByPostalCode(data[0]);
-      const botReply = { type: 'bot', text: cityInfo };
+      const botReply = { type: 'bot', text: cityInfo, botName: botNames.geo };
       addMessageToChat(botReply);
       saveMessage(codePostal, botReply);
     } else {
       const errorMessage = 'Aucune ville trouvée pour ce code postal.';
-      const botReply = { type: 'bot', text: errorMessage };
+      const botReply = { type: 'bot', text: errorMessage, botName: botNames.geo };
       addMessageToChat(botReply);
       saveMessage(codePostal, botReply);
     }
   } catch (error) {
     console.error('Erreur API Géo:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations de la ville.';
-    const botReply = { type: 'bot', text: errorMessage };
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.geo };
     addMessageToChat(botReply);
     saveMessage(codePostal, botReply);
   }
-}
+};
 
 const formatCityInfoByPostalCode = (data) => {
   const { nom, code, codeDepartement, population } = data;
   return `Informations pour le code postal :\nNom de la ville : ${nom}\nCode INSEE : ${code}\nCode Département : ${codeDepartement}\nPopulation : ${population}`;
-}
-// randomuser
+};
+
 const generateRandomUser = async () => {
   const apiUrl = 'https://randomuser.me/api/';
 
@@ -155,17 +166,17 @@ const generateRandomUser = async () => {
     }
     const data = await response.json();
     const userInfo = formatRandomUserInfo(data.results[0]);
-    const botReply = { type: 'bot', text: userInfo };
+    const botReply = { type: 'bot', text: userInfo, botName: botNames.randomUser };
     addMessageToChat(botReply);
     saveMessage('generateRandomUser', botReply);
   } catch (error) {
     console.error('Erreur API Random User:', error.message);
     const errorMessage = 'Désolé, nous n\'avons pas pu générer un utilisateur.';
-    const botReply = { type: 'bot', text: errorMessage };
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
     addMessageToChat(botReply);
     saveMessage('generateRandomUser', botReply);
   }
-}
+};
 
 const formatRandomUserInfo = (user) => {
   const { name, location, email, login, picture } = user;
@@ -179,7 +190,7 @@ const formatRandomUserInfo = (user) => {
       <p>Mot de passe : ${login.password}</p>
     </div>
   `;
-}
+};
 
 const displayHelp = () => {
   const helpMessage = `Commandes disponibles :
@@ -188,14 +199,14 @@ const displayHelp = () => {
 3. "je veux générer un utilisateur" - Pour générer un utilisateur aléatoire avec ses informations.
 4. "help" - Pour afficher ce message d'aide.`;
 
-  const botReply = { type: 'bot', text: helpMessage };
+  const botReply = { type: 'bot', text: helpMessage, botName: 'HelperBot' };
   addMessageToChat(botReply);
   saveMessage('help', botReply);
-}
+};
 
 const clearLocalStorage = () => {
   localStorage.removeItem('chatMessages');
   document.getElementById('chatBox').innerHTML = '';
-}
+};
 
 document.addEventListener('DOMContentLoaded', initializeApp);
