@@ -30,8 +30,9 @@ const sendMessage = () => {
     const userMessage = { type: 'user', text: messageText };
     addMessageToChat(userMessage);
 
-    if (messageText.startsWith('je veux les coordonnées géographique du code insee suivant ')) {
-      const codeINSEE = messageText.substring('je veux les coordonnées géographique du code insee suivant '.length);
+
+    if (messageText.startsWith('je veux les coordonnées géographique de ')) {
+      const codeINSEE = messageText.substring('je veux les coordonnées géographique de '.length);
       fetchCityInfo(codeINSEE, userMessage);
     } else if (messageText.startsWith('je veux les informations de la ville suivante ')) {
       const codePostal = messageText.substring('je veux les informations de la ville suivante '.length);
@@ -40,19 +41,25 @@ const sendMessage = () => {
       generateRandomUser(userMessage);
     } else if (messageText.toLowerCase() === 'je veux un utilisateur avec les mots de passe cryptée') {
       generateRandomUserWithEncryptedPasswords(userMessage);
-    } else if (messageText.toLowerCase().startsWith('je veux générer ')) {
+    } else if (messageText.toLowerCase().startsWith('je veux générer ') && messageText.toLowerCase().includes(' utilisateurs')) {
       const numberOfUsers = parseInt(messageText.split(' ')[3], 10);
       if (!isNaN(numberOfUsers)) {
-        generateMultipleRandomUsers(numberOfUsers, userMessage);
+        generateMultipleRandomUsers(numberOfUsers, userMessage); 
       } else {
         const botReply = { type: 'bot', text: 'Veuillez spécifier un nombre valide.', botName: 'UserBot' };
         addMessageToChat(botReply);
         saveMessagePair(userMessage, botReply);
       }
+    } else if (messageText.toLowerCase().startsWith('je veux connaitre l\'heure du lever et du couche de soleil de ')) {
+      const codeINSEE = messageText.substring('je veux connaitre l\'heure du lever et du couche de soleil de '.length);
+      fetchSunriseSunset(codeINSEE, userMessage);
     } else if (messageText.toLowerCase() === 'help') {
       displayHelp(userMessage);
+    } else if (messageText.toLowerCase().startsWith('je veux connaitre la température de ')) {
+      const codeINSEE = messageText.substring('je veux connaitre la température de '.length);
+      fetchWeather(codeINSEE, userMessage);
     } else {
-      const botReply = { type: 'bot', text: 'Désolé, je ne comprends pas votre demande.', botName: 'HelperBot' };
+      const botReply = { type: 'bot', text: 'Désolé, je ne comprends pas votre demande. Tapez Help pour plus de renseignement', botName: 'HelperBot' };
       addMessageToChat(botReply);
       saveMessagePair(userMessage, botReply);
     }
@@ -166,6 +173,88 @@ const formatCityInfoByPostalCode = (data) => {
   return `Informations pour le code postal :\nNom de la ville : ${nom}\nCode INSEE : ${code}\nCode Département : ${codeDepartement}\nPopulation : ${population}`;
 };
 
+const fetchWeather = async (codeINSEE, userMessage) => {
+  const apiUrl = `https://api.meteo-concept.com/api/forecast/daily/periods?token=${apiToken}&insee=${encodeURIComponent(codeINSEE)}`;
+
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des données.');
+    }
+    const data = await response.json();
+    const weatherInfo = formatWeatherInfo(data); 
+    const botReply = { type: 'bot', text: weatherInfo, botName: botNames.meteo };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  } catch (error) {
+    console.error('Erreur API Météo Concept:', error.message);
+    const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations météorologiques.';
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.meteo };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  }
+};
+
+
+const formatWeatherInfo = (data) => {
+  const now = new Date();
+  const hour = now.getHours();
+
+  let periodIndex;
+  if (hour >= 6 && hour < 12) {
+    periodIndex = 0; 
+  } else if (hour >= 12 && hour < 18) {
+    periodIndex = 1; 
+  } else {
+    periodIndex = 2; 
+  }
+
+  const { forecast } = data;
+  const weatherData = forecast[0][periodIndex];
+  const { temp2m } = weatherData;
+  const periodName = getPeriodName(periodIndex);
+
+  return `Température prévue pour ${periodName}: ${temp2m}°C`;
+};
+
+
+const getPeriodName = (periodIndex) => {
+  switch (periodIndex) {
+    case 0:
+      return 'le matin';
+    case 1:
+      return 'l\'après-midi';
+    case 2:
+      return 'le soir / la nuit';
+    default:
+      return 'la période';
+  }
+};
+
+
+const fetchSunriseSunset = async (codeINSEE, userMessage) => {
+  const apiUrl = `https://api.meteo-concept.com/api/ephemeride/1?token=${apiToken}&insee=${encodeURIComponent(codeINSEE)}`;
+
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des données.');
+    }
+    const data = await response.json();
+    const sunrise = data.ephemeride.sunrise;
+    const sunset = data.ephemeride.sunset;
+    const botReply = { type: 'bot', text: `Heure du lever de soleil : ${sunrise}\nHeure du coucher de soleil : ${sunset}`, botName: botNames.meteo };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  } catch (error) {
+    console.error('Erreur API Météo Concept:', error.message);
+    const errorMessage = 'Désolé, nous n\'avons pas pu récupérer les informations de lever et coucher de soleil.';
+    const botReply = { type: 'bot', text: errorMessage, botName: botNames.meteo };
+    addMessageToChat(botReply);
+    saveMessagePair(userMessage, botReply);
+  }
+};
+
 const generateRandomUser = async (userMessage) => {
   const apiUrl = 'https://randomuser.me/api/';
 
@@ -181,15 +270,16 @@ const generateRandomUser = async (userMessage) => {
     saveMessagePair(userMessage, botReply);
   } catch (error) {
     console.error('Erreur API Random User:', error.message);
-    const errorMessage = 'Désolé, nous n\'avons pas pu générer un utilisateur.';
+    const errorMessage = 'Désolé, nous n\'avons pas pu générer d\'utilisateur.';
     const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
     addMessageToChat(botReply);
     saveMessagePair(userMessage, botReply);
   }
 };
 
+
 const generateRandomUserWithEncryptedPasswords = async (userMessage) => {
-  const apiUrl = 'https://randomuser.me/api/';
+  const apiUrl = 'https://randomuser.me/api/?password=upper,8-16';
 
   try {
     const response = await fetch(apiUrl);
@@ -203,7 +293,7 @@ const generateRandomUserWithEncryptedPasswords = async (userMessage) => {
     saveMessagePair(userMessage, botReply);
   } catch (error) {
     console.error('Erreur API Random User:', error.message);
-    const errorMessage = 'Désolé, nous n\'avons pas pu générer un utilisateur.';
+    const errorMessage = 'Désolé, nous n\'avons pas pu générer d\'utilisateur avec les mots de passe cryptés.';
     const botReply = { type: 'bot', text: errorMessage, botName: botNames.randomUser };
     addMessageToChat(botReply);
     saveMessagePair(userMessage, botReply);
@@ -265,16 +355,15 @@ const formatRandomUserInfoWithEncryptedPasswords = (user) => {
 
 const displayHelp = (userMessage) => {
   const helpMessage = `Commandes disponibles :
-- GeoBot : 
-1. "je veux les coordonnées géographique du code insee suivant [code INSEE]" - Pour obtenir les coordonnées géographiques d'une ville par son code INSEE.
-- InfoBot : 
-2. "je veux les informations de la ville suivante [code postal]" - Pour obtenir les informations sur une ville par son code postal.
-- UserBot : 
-3. "je veux générer un utilisateur" - Pour générer un utilisateur aléatoire avec ses informations.
-4. "je veux un utilisateur avec les mots de passe cryptée" - Pour générer un utilisateur aléatoire avec les mots de passe cryptés.
-5. "je veux générer [nombre] utilisateurs" - Pour générer plusieurs utilisateurs aléatoires.
-HelperBot :
-6. "help" - Pour afficher ce message d'aide.`;
+  
+1. "je veux les coordonnées géographique de [code INSEE]" - Pour obtenir les coordonnées géographiques d'une ville par son code INSEE.
+2. "je veux connaitre la température de [code INSEE]" - Pour obtenir la prévision de la température d'une ville par son code INSEE selon sa période actuelle.
+3. "je veux connaitre l'heure du lever et du couche de soleil de [code INSEE]" - Pour obtenir l'heure du lever et du coucher de soleil d'une ville par son code INSEE.
+4. "je veux les informations de la ville suivante [code postal]" - Pour obtenir les informations sur une ville par son code postal (utilité connaître le code INSEE de la ville ).
+5. "je veux générer un utilisateur" - Pour générer un utilisateur aléatoire avec ses informations.
+6. "je veux un utilisateur avec les mots de passe cryptée" - Pour générer un utilisateur aléatoire avec les mots de passe cryptés.
+7. "je veux générer [nombre] utilisateurs" - Pour générer plusieurs utilisateurs aléatoires.
+8. "help" - Pour afficher ce message d'aide.`;
 
   const botReply = { type: 'bot', text: helpMessage, botName: 'HelperBot' };
   addMessageToChat(botReply);
